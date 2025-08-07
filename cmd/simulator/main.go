@@ -4,7 +4,11 @@
 package main
 
 import (
-	"fmt"
+	"context"
+	"log"
+	"os"
+	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/allthepins/iot-sensor-network-simulator/internal/aggregator"
@@ -13,39 +17,86 @@ import (
 )
 
 func main() {
-	// Number of sensors
-	// TODO Set this via arg or config value
-	const sensorCount = 5000
+	// Simulation parameters
+	// TODO Set these via args or config values
+	var (
+		sensorCount        = 5000
+		simulationDuration = 10 * time.Second
+		sensorInterval     = 100 * time.Millisecond
+	)
 
-	// Number of seconds simulation should run for (in seconds)
-	// TODO Set this via arg or config value
-	const simulationDuration = 10
+	// Main context that can be cancelled by an OS signal (e.g `ctrl+c`).
+	mainCtx, stopMain := context.WithCancel(context.Background())
 
-	// Channels
-	dataCh := make(chan model.SensorData, 1000) // Buffered channel sensors send data to.
-	stopCh := make(chan struct{})               // Channel we signal to stop sensors.
-	done := make(chan struct{})                 // Channel the aggregator signals when it's done.
+	// Channel to listen for interrupt signals.
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt) // Listen for SIGINT
 
-	// Start aggregator
-	go aggregator.Run(dataCh, done)
+	// Launch a goroutine to wait for a SIGINT signal.
+	// It cancels the main context if it receives one.
+	go func() {
+		<-sigCh
+		log.Println("Shutdown signal received, starting graceful shutdown.")
+		stopMain()
+	}()
 
-	// Start sensors
+	// Create a derived context that is automatically cancelled after the simulation duration,
+	// or by the main context being cancelled by an OS interrupt.
+	// This context is the primary signal for all goroutines to begin graceful shutdown.
+	ctx, cancel := context.WithTimeout(mainCtx, simulationDuration)
+	defer cancel()
+
+	// Buffered channel sensors send data to.
+	dataCh := make(chan model.SensorData, 1000)
+
+	// WaitGroups to coordinate a graceful shutdown.
+	// sensorsWg for the sensors.
+	// aggregatorWg for the aggregator.
+	var sensorsWg, aggregatorWg sync.WaitGroup
+
+	// Start the aggregator.
+	aggregatorWg.Add(1)
+	go func() {
+		defer aggregatorWg.Done()
+
+		// Instantiate and run the aggregator.
+		// It should run until its context is cancelled
+		// and the data channel is drained and closed.
+		aggregator.New(dataCh).Run(ctx)
+	}()
+
+	// Start sensors.
 	for i := 1; i <= sensorCount; i++ {
-		go sensor.Start(i, dataCh, stopCh)
+		sensorsWg.Add(1)
+
+		// TODO Look into refactoring `sensor.Start` such that we can directly wait for it,
+		// rather than having to wrap its invocation in another goroutine (so it can be integrated with sensorsWg).
+		go func(id int, interval time.Duration) {
+			defer sensorsWg.Done()
+
+			sensor.Start(ctx, id, dataCh, interval)
+			// Wait for the shutdown signal from the context.
+			// When the context is cancelled, the sensor's internal goroutine alse receives the signal and will terminate.
+			// This ensures Done() is called only after the sensor is asked to stop,
+			<-ctx.Done()
+		}(i, sensorInterval)
 	}
 
-	// Let simulation run for given duration
-	time.Sleep(simulationDuration * time.Second)
+	log.Printf("Simulation starting with %d sensors for %s.", sensorCount, simulationDuration)
 
-	// Signal sensors to stop
-	close(stopCh)
+	// Launch a dedicated goroutine to orchestrate the shutdown of sensors.
+	go func() {
+		// Wait for sensors to be done.
+		// (When their context is cancelled or the simulationDuration elapses).
+		sensorsWg.Wait()
 
-	// Close data channel once sensors have stopped sending
-	// TODO Switch to sync.Waitgroup to wait for sensors
-	time.Sleep(1 * time.Second)
-	close(dataCh)
+		// Now safe to close the data channel.
+		close(dataCh)
+		log.Println("All sensors shutdown. Data channel closed.")
+	}()
 
-	// Wait for aggregator to signal it's done
-	<-done
-	fmt.Println("Simulation ended gracefully")
+	// Wait for the aggregator.
+	aggregatorWg.Wait()
+
+	log.Println("Simulation ended gracefully.")
 }
