@@ -20,6 +20,8 @@ It concurrently runs thousands of virtual sensors that send data to a central ag
 │   ├── model/              # Shared data structures (e.g. SensorData).
 │   └── sensor/             # Simulates a single IoT sensor.
 ├── go.mod                  # Go module definitions.
+├── Dockerfile              # Build instructions for the iot-simulator Docker container image.
+├── compose.yaml            # Docker Compose (V2) config.
 └── README.md               # You are here :)
 ```
 
@@ -27,17 +29,32 @@ It concurrently runs thousands of virtual sensors that send data to a central ag
 
 ### Prerequisites
 
-- Go 1.18 or later.
+- Docker 28 or later.
 
 ### Usage
 
-**Run the simulator:**
-The application can be run direcly using the `go run` command. The simulation runs for a configured duration (default: 10 seconds) or until you stop it manually with `ctrl+c`.
+#### Running with docker: 
+The simulation runs for a configured diratio (default: 10 seconds) or until you stop it manually with `ctrl+c`.
+1. **Build and run the simulator:**
+```shell
+docker compose up --build
+```
+
+2. **Observe the output:**
+
+   You will see logs from the aggregator and sensors directly in your terminal.
+
+3. **Stopping the simulation:**
+
+   Press `ctrl+c` at anytime to initiate a graceful shutdown. The application will stop all sensors, process any remaining data, and then exit.
+
+#### Running natively (local development):
+This requires Go 1.18 or later.
+
+The application can be run direcly using the `go run` command. It runs for the configured duration or until you stop it manually with `ctrl+c`.
 ```shell
 go run ./cmd/simulator
 ```
-
-You will see logs form the aggregator and sensors.
 
 ### Running Tests
 
