@@ -1,0 +1,8 @@
+services:
+  simulator:
+    build: .
+    container_name: iot-simulator
+    # Connect host's terminal to the container to allow
+    # `ctrl+c` (SIGINT) to be passed through.
+    tty: true  # Attach a pseudo-TTY to the container.
+    stdin_open: true  # Allow sending input to the container through standard input.
