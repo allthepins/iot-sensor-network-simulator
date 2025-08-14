@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "iot-simulator"
+    static_configs:
+      - targets: ["simulator:2112"]

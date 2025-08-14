@@ -6,27 +6,84 @@ package main
 import (
 	"context"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"sync"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/allthepins/iot-sensor-network-simulator/internal/aggregator"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/model"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/sensor"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
+
+// startMetricsServer starts the Prometheus metrics server.
+func startMetricsServer(ctx context.Context) {
+	server := &http.Server{Addr: ":2112"}
+	http.Handle("/metrics", promhttp.Handler())
+
+	go func() {
+		log.Println("Metrics server starting on :2112")
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("Metrics server failed: %v", err)
+		}
+	}()
+
+	// Wait for the main context to be cancelled then gracefully shutdown the server.
+	<-ctx.Done()
+	log.Println("Shutting down metrics server...")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("Metrics server shutdown failed: %v", err)
+	}
+}
+
+// startPprofServer starts an HTTP server with pprof enabled on :6060/debug/pprof/
+func startPprofServer(ctx context.Context) {
+	server := &http.Server{
+		Addr:    ":6060",
+		Handler: http.DefaultServeMux, // Uses the default mux where pprof is registered
+	}
+
+	go func() {
+		log.Println("pprof server starting on :6060")
+		if err := server.ListenAndServe(); err != http.ErrServerClosed {
+			log.Fatalf("pprof server failed: %v", err)
+		}
+	}()
+
+	// Graceful shutdown on context cancellation
+	<-ctx.Done()
+	log.Println("Shutting down pprof server...")
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("pprof server shutdown failed: %v", err)
+	}
+}
 
 func main() {
 	// Simulation parameters
 	// TODO Set these via args or config values
 	var (
 		sensorCount        = 5000
-		simulationDuration = 10 * time.Second
+		simulationDuration = 10 * time.Minute // Increased simulation duration to allow more time to monitor metrics.
 		sensorInterval     = 100 * time.Millisecond
 	)
 
 	// Main context that can be cancelled by an OS signal (e.g `ctrl+c`).
 	mainCtx, stopMain := context.WithCancel(context.Background())
+
+	// Start the metrics server in a separate goroutine.
+	go startMetricsServer(mainCtx)
+
+	// Start the pprof server in a separate goroutine.
+	// This allows us to use go pprof tool profiling.
+	go startPprofServer(mainCtx)
 
 	// Channel to listen for interrupt signals.
 	sigCh := make(chan os.Signal, 1)

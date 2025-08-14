@@ -6,6 +6,7 @@ import (
 	"context"
 	"log"
 
+	"github.com/allthepins/iot-sensor-network-simulator/internal/metrics"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/model"
 )
 
@@ -38,6 +39,9 @@ func (a *Aggregator) Run(ctx context.Context) {
 			if !ok {
 				return
 			}
+
+			// Instrument the message receipt.
+			metrics.MessagesReceived.Inc()
 
 			log.Printf("Aggregator received: Sensor %d - %f", data.ID, data.Value)
 		}
