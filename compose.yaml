@@ -2,7 +2,26 @@ services:
   simulator:
     build: .
     container_name: iot-simulator
+    # Expose the metrics port to other containers on the same Docker network.
+    # No need to map it to the host since only Prometheus needs to access it.
+    expose:
+      - "2112"
+      - "6060" # Expose pprof port internally
+    ports:
+      - "6060:6060" # Map pprof port to host for local access
     # Connect host's terminal to the container to allow
     # `ctrl+c` (SIGINT) to be passed through.
     tty: true  # Attach a pseudo-TTY to the container.
     stdin_open: true  # Allow sending input to the container through standard input.
+
+  prometheus:
+    image: prom/prometheus:v3.5.0
+    container_name: prometheus
+    # Map the host port 9090 to the container's port 9090 to access the Prometheus UI.
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    # A command-line flag to tell Prometheus where to find its configuration file.
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'

@@ -7,9 +7,11 @@ import (
 	"context"
 	"log"
 	"math/rand"
+	"strconv"
 	"sync"
 	"time"
 
+	"github.com/allthepins/iot-sensor-network-simulator/internal/metrics"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/model"
 )
 
@@ -20,16 +22,20 @@ type Sensor struct {
 	Interval time.Duration
 	rand     *rand.Rand
 	randMux  sync.Mutex
+	idStr    string // Store ID as a string for performance when labeling metrics.
+	metrics  *metrics.Metrics
 }
 
 // NewSensor creates and returns a new Sensor instance.
-func NewSensor(id int, dataCh chan<- model.SensorData, interval time.Duration) *Sensor {
+func NewSensor(id int, dataCh chan<- model.SensorData, interval time.Duration, m *metrics.Metrics) *Sensor {
 	randSrc := rand.NewSource(time.Now().UnixNano() + int64(id)) // Add the id to ensure sensors created at the exact same nanosecond have different random sequences.
 	return &Sensor{
 		ID:       id,
 		DataCh:   dataCh,
 		Interval: interval,
 		rand:     rand.New(randSrc),
+		idStr:    strconv.Itoa(id), // Convert ID to string once.
+		metrics:  m,
 	}
 }
 
@@ -41,6 +47,11 @@ func (s *Sensor) Run(ctx context.Context) {
 	defer ticker.Stop()
 
 	log.Printf("Sensor %d starting\n", s.ID)
+
+	if s.metrics != nil {
+		s.metrics.ActiveSensors.Inc()
+		defer s.metrics.ActiveSensors.Dec()
+	}
 
 	for {
 		select {
@@ -59,26 +70,38 @@ func (s *Sensor) Run(ctx context.Context) {
 				Timestamp: time.Now(),
 			}
 			s.DataCh <- data
+
+			// Instrument the message send and value observation.
+			if s.metrics != nil {
+				s.metrics.MessagesSent.WithLabelValues(s.idStr).Inc()
+				s.metrics.GeneratedValues.WithLabelValues(s.idStr).Observe(value)
+			}
 		}
 	}
 }
 
 // Start launches a simulated sensor (identified by ID) as a goroutine with panic recovery.
 // The goroutine runs the Sensor's Run method.
-func Start(ctx context.Context, id int, dataCh chan<- model.SensorData, interval time.Duration) {
+func Start(ctx context.Context, id int, dataCh chan<- model.SensorData, interval time.Duration, m *metrics.Metrics) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("Sensor %d panicked: %v - restarting\n", id, r)
+
 				// Restart the sensor only if the context is not done.
 				// This prevents a panic-restart loop if the context is cancelled.
 				if ctx.Err() == nil {
-					Start(ctx, id, dataCh, interval)
+					// Instrument the restart.
+					if m != nil {
+						m.SensorRestarts.WithLabelValues(strconv.Itoa(id)).Inc()
+					}
+
+					Start(ctx, id, dataCh, interval, m)
 				}
 			}
 		}()
 
-		s := NewSensor(id, dataCh, interval)
+		s := NewSensor(id, dataCh, interval, m)
 		s.Run(ctx)
 	}()
 }

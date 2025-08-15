@@ -11,22 +11,41 @@ import (
 	"sync"
 	"time"
 
+	_ "net/http/pprof"
+
 	"github.com/allthepins/iot-sensor-network-simulator/internal/aggregator"
+	"github.com/allthepins/iot-sensor-network-simulator/internal/metrics"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/model"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/sensor"
+	"github.com/allthepins/iot-sensor-network-simulator/internal/server"
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 func main() {
-	// Simulation parameters
-	// TODO Set these via args or config values
+	// Simulation and metrics parameters
+	// TODO Set simulation params via args or config values
 	var (
 		sensorCount        = 5000
-		simulationDuration = 10 * time.Second
+		simulationDuration = 10 * time.Minute // Increased simulation duration to allow more time to monitor metrics.
 		sensorInterval     = 100 * time.Millisecond
+		metricsAddr        = ":2112"
+		pprofAddr          = ":6060"
 	)
+
+	// Metrics and Server setup
+	reg := prometheus.NewRegistry()
+	appMetrics := metrics.NewMetrics(reg)
+	metricsServer := server.NewMetricsServer(metricsAddr, reg)
 
 	// Main context that can be cancelled by an OS signal (e.g `ctrl+c`).
 	mainCtx, stopMain := context.WithCancel(context.Background())
+
+	// Start the metrics server in a separate goroutine.
+	go metricsServer.Serve(mainCtx)
+
+	// Start the pprof server in a separate goroutine.
+	// This allows us to use go pprof tool profiling.
+	go server.StartPprofServer(mainCtx, pprofAddr)
 
 	// Channel to listen for interrupt signals.
 	sigCh := make(chan os.Signal, 1)
@@ -62,7 +81,7 @@ func main() {
 		// Instantiate and run the aggregator.
 		// It should run until its context is cancelled
 		// and the data channel is drained and closed.
-		aggregator.New(dataCh).Run(ctx)
+		aggregator.New(dataCh, appMetrics).Run(ctx)
 	}()
 
 	// Start sensors.
@@ -74,7 +93,7 @@ func main() {
 		go func(id int, interval time.Duration) {
 			defer sensorsWg.Done()
 
-			sensor.Start(ctx, id, dataCh, interval)
+			sensor.Start(ctx, id, dataCh, interval, appMetrics)
 			// Wait for the shutdown signal from the context.
 			// When the context is cancelled, the sensor's internal goroutine alse receives the signal and will terminate.
 			// This ensures Done() is called only after the sensor is asked to stop,
