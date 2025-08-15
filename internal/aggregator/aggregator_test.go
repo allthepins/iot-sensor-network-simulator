@@ -30,7 +30,7 @@ func setupTest(t *testing.T) (*bytes.Buffer, func()) {
 func TestNewAggregator(t *testing.T) {
 	t.Parallel()
 	dataCh := make(chan model.SensorData)
-	agg := aggregator.New(dataCh)
+	agg := aggregator.New(dataCh, nil)
 
 	if agg == nil {
 		t.Fatal("New returned nil")
@@ -47,7 +47,7 @@ func TestAggregator_Run_ProcessesData(t *testing.T) {
 	defer cleanup()
 
 	dataCh := make(chan model.SensorData, 1) // Buffer channel to prevent blocking
-	agg := aggregator.New(dataCh)
+	agg := aggregator.New(dataCh, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -78,7 +78,7 @@ func TestAggregator_Run_ProcessesData(t *testing.T) {
 func TestAggregator_Run_StopsOnContextCancel(t *testing.T) {
 	t.Parallel()
 	dataCh := make(chan model.SensorData)
-	agg := aggregator.New(dataCh)
+	agg := aggregator.New(dataCh, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	runFinished := make(chan struct{})
@@ -101,7 +101,7 @@ func TestAggregator_Run_StopsOnContextCancel(t *testing.T) {
 func TestAggregator_Run_StopsOnChannelClose(t *testing.T) {
 	t.Parallel()
 	dataCh := make(chan model.SensorData)
-	agg := aggregator.New(dataCh)
+	agg := aggregator.New(dataCh, nil)
 	ctx := context.Background()
 
 	runFinished := make(chan struct{})

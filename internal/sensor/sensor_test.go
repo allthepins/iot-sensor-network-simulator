@@ -23,7 +23,7 @@ func TestNewSensor(t *testing.T) {
 	interval := 100 * time.Millisecond
 	dataCh := make(chan model.SensorData)
 
-	s := sensor.NewSensor(id, dataCh, interval)
+	s := sensor.NewSensor(id, dataCh, interval, nil)
 
 	if s == nil {
 		t.Fatal("NewSensor returned nil")
@@ -46,7 +46,7 @@ func TestSensor_Run(t *testing.T) {
 
 	interval := 10 * time.Millisecond
 	dataCh := make(chan model.SensorData, 1) // Buffered channel to prevent blocking
-	s := sensor.NewSensor(1, dataCh, interval)
+	s := sensor.NewSensor(1, dataCh, interval, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -95,7 +95,7 @@ func TestStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sensor.Start(ctx, 1, dataCh, interval)
+	sensor.Start(ctx, 1, dataCh, interval, nil)
 
 	// Verify data is being sent.
 	select {
@@ -138,7 +138,7 @@ func TestStart_PanicRecovery(t *testing.T) {
 	defer cancel()
 
 	// Start the sensor. It should panic, recover, log, and restart in a loop.
-	sensor.Start(ctx, 99, dataCh, interval)
+	sensor.Start(ctx, 99, dataCh, interval, nil)
 
 	// Poll the log buffer for the expected panic message.
 	const pollTimeout = 100 * time.Millisecond

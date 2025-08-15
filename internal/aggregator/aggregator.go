@@ -12,13 +12,15 @@ import (
 
 // Aggregator processes sensor data.
 type Aggregator struct {
-	DataCh <-chan model.SensorData
+	DataCh  <-chan model.SensorData
+	metrics *metrics.Metrics
 }
 
 // New creates and returns a new Aggregator instance.
-func New(dataCh <-chan model.SensorData) *Aggregator {
+func New(dataCh <-chan model.SensorData, m *metrics.Metrics) *Aggregator {
 	return &Aggregator{
-		DataCh: dataCh,
+		DataCh:  dataCh,
+		metrics: m,
 	}
 }
 
@@ -41,7 +43,9 @@ func (a *Aggregator) Run(ctx context.Context) {
 			}
 
 			// Instrument the message receipt.
-			metrics.MessagesReceived.Inc()
+			if a.metrics != nil {
+				a.metrics.MessagesReceived.Inc()
+			}
 
 			log.Printf("Aggregator received: Sensor %d - %f", data.ID, data.Value)
 		}
