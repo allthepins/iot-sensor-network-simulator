@@ -21,7 +21,7 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
     # A command-line flag to tell Prometheus where to find its configuration file.
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
