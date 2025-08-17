@@ -28,10 +28,10 @@ It concurrently runs thousands of virtual sensors that send data to a central ag
 │   ├── sensor/             # Simulates a single IoT sensor.
 │   └── server/             # HTTP server for the metrics and pprof endpoints.
 ├── grafana/                # Grafana configuration.
+├── prometheus/             # Prometheus configuration.
 ├── go.mod                  # Go module definitions.
 ├── Dockerfile              # Build instructions for the iot-simulator Docker container image.
 ├── compose.yaml            # Docker Compose (V2) config.
-├── prometheus.yml          # Prometheus scrape target configuration.
 └── README.md               # You are here :)
 ```
 
@@ -161,10 +161,11 @@ Inspect in interactive mode:
 
 - [x] Prometheus metrics: messages, restarts, values
 - [x] `/metrics` HTTP endpoint
-- [ ] Grafana dashboard
-- [ ] Alert: high restart count
-- [ ] Time series: sensor value by ID
-- [ ] Table: per-sensor message counts
+- [x] Grafana dashboard
+- [x] Alert: high restart count
+- [x] Time series: sensor value by ID
+- [x] Table: per-sensor message counts
+- [ ] Centralized log aggregation and visualization (in Grafana)
 
 ### **Publish/Subscribe**
 
