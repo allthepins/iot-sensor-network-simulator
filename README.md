@@ -14,6 +14,8 @@ It concurrently runs thousands of virtual sensors that send data to a central ag
 
 - **Real-time monitoring:** Metrics can be monitored in real-time via Prometheus.
 
+- **Pre-configured Dashboard:** Includes a Grafana dashboard for visualizing key metrics.
+
 - **Built-in profiling:** Uses Go's built-in `pprof` tools to inspect performance in real time.
 
 ## Directory Structure
@@ -25,6 +27,7 @@ It concurrently runs thousands of virtual sensors that send data to a central ag
 │   ├── model/              # Shared data structures (e.g. SensorData).
 │   ├── sensor/             # Simulates a single IoT sensor.
 │   └── server/             # HTTP server for the metrics and pprof endpoints.
+├── grafana/                # Grafana configuration.
 ├── go.mod                  # Go module definitions.
 ├── Dockerfile              # Build instructions for the iot-simulator Docker container image.
 ├── compose.yaml            # Docker Compose (V2) config.
@@ -55,6 +58,11 @@ docker compose up --build
 
    Press `ctrl+c` at anytime to initiate a graceful shutdown. The application will stop all sensors, process any remaining data, and then exit.
 
+   To stop and remove the containers and their volumes, run:
+   ```shell
+   docker compose down -v
+   ```
+
 #### Running natively (local development):
 This requires Go 1.18 or later.
 
@@ -73,7 +81,17 @@ go test -v ./...
 
 (This will discover and run all files ending in _test.go)
 
-### Viewing Metrics in Prometheus
+### Visualizing with Grafana
+
+The stack includes a Grafana instance with a pre-built dashboard which provides an overview of the simulator's performance.
+
+1. Access the Grafana UI at http://localhost:3000
+2. Login using the credentials `admin`/`admin`.
+3. Navigate to "Dashboards" to find the "IoT Simulator Dashboard".
+
+The dashboard in addition to providing real-time insights also fires an alert if any sensor restarts within a 5-minute window.
+
+### Viewing Metrics directly in Prometheus
 
 Prometheus automatically scrapes metrics exposed by the simulator at http://simulator:2112/metrics (this endpoint has only been exposed internally within Docker).
 

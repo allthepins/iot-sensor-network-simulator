@@ -25,3 +25,21 @@ services:
     # A command-line flag to tell Prometheus where to find its configuration file.
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
+
+  grafana:
+    image: grafana/grafana:12.1.1
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      # Mount provisioning files for datasources and dashboards
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+      # Mount dashboard JSON file
+      - ./grafana/provisioning/dashboards/:/etc/grafana/provisioning/dashboards/
+    environment:
+      # Set default admin user and password
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    depends_on:
+      # Ensure Prometheus is started before Grafana
+      - prometheus

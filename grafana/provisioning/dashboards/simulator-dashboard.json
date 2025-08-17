@@ -1,0 +1,147 @@
+{
+  "id": null,
+  "editable": true,
+  "graphTooltip": 0,
+  "panels": [
+    {
+      "id": 1,
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 0 },
+      "type": "row",
+      "title": "High-Level Overview"
+    },
+    {
+      "id": 2,
+      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 2 },
+      "type": "stat",
+      "title": "Active Sensors",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "iot_simulator_active_sensors",
+          "instant": true,
+          "legendFormat": ""
+        }
+      ],
+      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+    },
+    {
+      "id": 3,
+      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 2 },
+      "type": "stat",
+      "title": "Message Ingestion Rate",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(iot_simulator_aggregator_messages_received_total[1m]))",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "Mps" }
+      },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+    },
+    {
+      "id": 4,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 2 },
+      "type": "timeseries",
+      "title": "Message Rates (Sent vs. Received)",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(iot_simulator_sensor_messages_sent_total[1m]))",
+          "legendFormat": "Sent Rate"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(iot_simulator_aggregator_messages_received_total[1m]))",
+          "legendFormat": "Received Rate"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "Mps" } },
+      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+    },
+    {
+      "id": 5,
+      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 10 },
+      "type": "row",
+      "title": "Sensor Health & Performance"
+    },
+    {
+      "id": 6,
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "type": "timeseries",
+      "title": "Sensor Restarts Over Time",
+      "alerting": {
+        "notifications": [],
+        "rules": [
+          {
+            "for": "5m",
+            "noDataState": "NoData",
+            "execErrState": "Alerting",
+            "conditions": [
+              {
+                "type": "query",
+                "query": { "params": ["A", "5m", "now"] },
+                "reducer": { "type": "last" },
+                "evaluator": { "type": "gt", "params": [0] }
+              }
+            ],
+            "title": "High Sensor Restart Rate"
+          }
+        ]
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(increase(iot_simulator_sensor_restarts_total[1m]))",
+          "legendFormat": "Restarts"
+        }
+      ],
+      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+    },
+    {
+      "id": 7,
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "type": "table",
+      "title": "Sensors with Most Restarts",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sort_desc(sum by (sensor_id) (iot_simulator_sensor_restarts_total))",
+          "instant": true
+        }
+      ],
+      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+    },
+    {
+      "id": 8,
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "type": "heatmap",
+      "title": "Sensor Value Distribution",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(iot_simulator_sensor_generated_values_bucket[5m])) by (le)"
+        }
+      ],
+      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+    }
+  ],
+  "refresh": "10s",
+  "schemaVersion": 36,
+  "style": "dark",
+  "tags": [],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "IoT Simulator Dashboard",
+  "uid": "iot-simulator",
+  "version": 1
+}
