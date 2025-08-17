@@ -2,7 +2,7 @@ package metrics
 
 import (
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/prometheus/client_golang/prometheus/collectors"
 )
 
 const namespace = "iot_simulator"
@@ -18,7 +18,7 @@ type Metrics struct {
 
 func NewMetrics(reg prometheus.Registerer) *Metrics {
 	m := &Metrics{
-		ActiveSensors: promauto.NewGauge(prometheus.GaugeOpts{
+		ActiveSensors: prometheus.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Name:      "active_sensors",
 			Help:      "The current number of active sensor goroutines.",
@@ -52,11 +52,16 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 
 	// Register all collectors with the provided registerer.
 	reg.MustRegister(
+		// Custom application metrics
 		m.ActiveSensors,
 		m.MessagesSent,
 		m.GeneratedValues,
 		m.SensorRestarts,
 		m.MessagesReceived,
+
+		// Go runtime and process metrics
+		collectors.NewGoCollector(),
+		collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}),
 	)
 
 	return m
