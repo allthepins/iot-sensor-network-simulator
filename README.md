@@ -165,7 +165,7 @@ Inspect in interactive mode:
 - [x] Alert: high restart count
 - [x] Time series: sensor value by ID
 - [x] Table: per-sensor message counts
-- [ ] Centralized log aggregation and visualization (in Grafana)
+- [x] Centralized log aggregation and visualization (in Grafana)
 
 ### **Publish/Subscribe**
 
