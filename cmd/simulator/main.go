@@ -5,7 +5,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
@@ -14,6 +14,7 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/allthepins/iot-sensor-network-simulator/internal/aggregator"
+	"github.com/allthepins/iot-sensor-network-simulator/internal/logging"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/metrics"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/model"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/sensor"
@@ -31,6 +32,10 @@ func main() {
 		metricsAddr        = ":2112"
 		pprofAddr          = ":6060"
 	)
+
+	// logging setup
+	logger := logging.NewJSONLogger()
+	slog.SetDefault(logger)
 
 	// Metrics and Server setup
 	reg := prometheus.NewRegistry()
@@ -55,7 +60,7 @@ func main() {
 	// It cancels the main context if it receives one.
 	go func() {
 		<-sigCh
-		log.Println("Shutdown signal received, starting graceful shutdown.")
+		logger.Info("Shutdown signal received, starting graceful shutdown.")
 		stopMain()
 	}()
 
@@ -81,7 +86,7 @@ func main() {
 		// Instantiate and run the aggregator.
 		// It should run until its context is cancelled
 		// and the data channel is drained and closed.
-		aggregator.New(dataCh, appMetrics).Run(ctx)
+		aggregator.New(dataCh, appMetrics, logger).Run(ctx)
 	}()
 
 	// Start sensors.
@@ -93,7 +98,7 @@ func main() {
 		go func(id int, interval time.Duration) {
 			defer sensorsWg.Done()
 
-			sensor.Start(ctx, id, dataCh, interval, appMetrics)
+			sensor.Start(ctx, id, dataCh, interval, appMetrics, logger)
 			// Wait for the shutdown signal from the context.
 			// When the context is cancelled, the sensor's internal goroutine alse receives the signal and will terminate.
 			// This ensures Done() is called only after the sensor is asked to stop,
@@ -101,7 +106,7 @@ func main() {
 		}(i, sensorInterval)
 	}
 
-	log.Printf("Simulation starting with %d sensors for %s.", sensorCount, simulationDuration)
+	logger.Info("Simulation starting", "sensor_count", sensorCount, "simulation_duration", simulationDuration)
 
 	// Launch a dedicated goroutine to orchestrate the shutdown of sensors.
 	go func() {
@@ -111,11 +116,11 @@ func main() {
 
 		// Now safe to close the data channel.
 		close(dataCh)
-		log.Println("All sensors shutdown. Data channel closed.")
+		logger.Info("All sensors shutdown. Data channel closed.")
 	}()
 
 	// Wait for the aggregator.
 	aggregatorWg.Wait()
 
-	log.Println("Simulation ended gracefully.")
+	logger.Info("Simulation ended gracefully.")
 }

@@ -4,8 +4,7 @@ package aggregator_test
 import (
 	"bytes"
 	"context"
-	"log"
-	"os"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
@@ -15,22 +14,19 @@ import (
 	"github.com/allthepins/iot-sensor-network-simulator/internal/model"
 )
 
-// setupTest redirects the global logger to a buffer for the duration of a test.
-// It returns the buffer and a cleanup function to restore the logger.
-func setupTest(t *testing.T) (*bytes.Buffer, func()) {
-	t.Helper()
-	var logBuf bytes.Buffer
-	log.SetOutput(&logBuf)
-	return &logBuf, func() {
-		log.SetOutput(os.Stderr)
-	}
+// newTestLogger returns a slog.Logger to facilitate testing function log text.
+func newTestLogger(buf *bytes.Buffer) *slog.Logger {
+	handler := slog.NewTextHandler(buf, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
+	return slog.New(handler)
 }
 
 // TestNewAggregator verifies that the New function correctly initializes an Aggregator.
 func TestNewAggregator(t *testing.T) {
 	t.Parallel()
 	dataCh := make(chan model.SensorData)
-	agg := aggregator.New(dataCh, nil)
+	agg := aggregator.New(dataCh, nil, nil)
 
 	if agg == nil {
 		t.Fatal("New returned nil")
@@ -43,11 +39,12 @@ func TestNewAggregator(t *testing.T) {
 // TestAggregator_Run_ProcesssesData verifies that the aggregator receives and logs data.
 func TestAggregator_Run_ProcessesData(t *testing.T) {
 	t.Parallel()
-	logBuf, cleanup := setupTest(t)
-	defer cleanup()
+
+	buf := &bytes.Buffer{}
+	logger := newTestLogger(buf)
 
 	dataCh := make(chan model.SensorData, 1) // Buffer channel to prevent blocking
-	agg := aggregator.New(dataCh, nil)
+	agg := aggregator.New(dataCh, nil, logger)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -62,11 +59,11 @@ func TestAggregator_Run_ProcessesData(t *testing.T) {
 	testData := model.SensorData{ID: 1, Value: 0.99}
 	dataCh <- testData
 
-	// Give the aggregator a moment to process.
-	time.Sleep(10 * time.Millisecond)
+	// Give the aggregator enough to process, so that the summary is logged.
+	time.Sleep(6 * time.Second)
 
-	if !strings.Contains(logBuf.String(), "Sensor 1 - 0.99") {
-		t.Errorf("expected log to contain processed data, but it didn't. Log %s", logBuf.String())
+	if !strings.Contains(buf.String(), "count=1") {
+		t.Errorf("expected log to contain summary of processed data, but it didn't. Log %s", buf.String())
 	}
 
 	cancel()
@@ -78,7 +75,7 @@ func TestAggregator_Run_ProcessesData(t *testing.T) {
 func TestAggregator_Run_StopsOnContextCancel(t *testing.T) {
 	t.Parallel()
 	dataCh := make(chan model.SensorData)
-	agg := aggregator.New(dataCh, nil)
+	agg := aggregator.New(dataCh, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	runFinished := make(chan struct{})
@@ -101,7 +98,7 @@ func TestAggregator_Run_StopsOnContextCancel(t *testing.T) {
 func TestAggregator_Run_StopsOnChannelClose(t *testing.T) {
 	t.Parallel()
 	dataCh := make(chan model.SensorData)
-	agg := aggregator.New(dataCh, nil)
+	agg := aggregator.New(dataCh, nil, nil)
 	ctx := context.Background()
 
 	runFinished := make(chan struct{})

@@ -4,8 +4,7 @@ package sensor_test
 import (
 	"bytes"
 	"context"
-	"log"
-	"os"
+	"log/slog"
 	"strings"
 	"sync"
 	"testing"
@@ -15,6 +14,12 @@ import (
 	"github.com/allthepins/iot-sensor-network-simulator/internal/sensor"
 )
 
+// newTestLogger returns an slog.Logger given a byte buffer buf, to aid testing function log text.
+func newTestLogger(buf *bytes.Buffer) *slog.Logger {
+	handler := slog.NewTextHandler(buf, &slog.HandlerOptions{Level: slog.LevelDebug})
+	return slog.New(handler)
+}
+
 // TestNewSensor verifies that the NewSensor function correctly initializes a Sensor.
 func TestNewSensor(t *testing.T) {
 	t.Parallel()
@@ -23,7 +28,7 @@ func TestNewSensor(t *testing.T) {
 	interval := 100 * time.Millisecond
 	dataCh := make(chan model.SensorData)
 
-	s := sensor.NewSensor(id, dataCh, interval, nil)
+	s := sensor.NewSensor(id, dataCh, interval, nil, nil)
 
 	if s == nil {
 		t.Fatal("NewSensor returned nil")
@@ -46,7 +51,7 @@ func TestSensor_Run(t *testing.T) {
 
 	interval := 10 * time.Millisecond
 	dataCh := make(chan model.SensorData, 1) // Buffered channel to prevent blocking
-	s := sensor.NewSensor(1, dataCh, interval, nil)
+	s := sensor.NewSensor(1, dataCh, interval, nil, nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -95,7 +100,7 @@ func TestStart(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	sensor.Start(ctx, 1, dataCh, interval, nil)
+	sensor.Start(ctx, 1, dataCh, interval, nil, nil)
 
 	// Verify data is being sent.
 	select {
@@ -125,9 +130,8 @@ func TestStart(t *testing.T) {
 // It redirects the log output to a buffer and checks it for the expected message.
 // TODO Can panic recovery be tested without relying on side-effects?
 func TestStart_PanicRecovery(t *testing.T) {
-	var logBuf bytes.Buffer
-	log.SetOutput(&logBuf)
-	defer log.SetOutput(os.Stderr) // Restore the original logger.
+	buf := &bytes.Buffer{}
+	logger := newTestLogger(buf)
 
 	interval := 10 * time.Millisecond
 	// Use a closed channel to trigger a panic when the sensor tries to send data.
@@ -138,17 +142,17 @@ func TestStart_PanicRecovery(t *testing.T) {
 	defer cancel()
 
 	// Start the sensor. It should panic, recover, log, and restart in a loop.
-	sensor.Start(ctx, 99, dataCh, interval, nil)
+	sensor.Start(ctx, 99, dataCh, interval, nil, logger)
 
 	// Poll the log buffer for the expected panic message.
 	const pollTimeout = 100 * time.Millisecond
 	deadline := time.Now().Add(pollTimeout)
 	for {
-		if strings.Contains(logBuf.String(), "panicked: send on closed channel - restarting") {
+		if strings.Contains(buf.String(), "Sensor panicked - restarting") {
 			return
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("timed out waiting for panic log message. Log content:\n%s", logBuf.String())
+			t.Fatalf("timed out waiting for panic log message. Log content:\n%s", buf.String())
 		}
 		time.Sleep(10 * time.Millisecond)
 	}

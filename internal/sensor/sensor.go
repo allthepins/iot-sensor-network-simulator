@@ -5,7 +5,7 @@ package sensor
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -24,10 +24,15 @@ type Sensor struct {
 	randMux  sync.Mutex
 	idStr    string // Store ID as a string for performance when labeling metrics.
 	metrics  *metrics.Metrics
+	logger   *slog.Logger
 }
 
 // NewSensor creates and returns a new Sensor instance.
-func NewSensor(id int, dataCh chan<- model.SensorData, interval time.Duration, m *metrics.Metrics) *Sensor {
+func NewSensor(id int, dataCh chan<- model.SensorData, interval time.Duration, m *metrics.Metrics, l *slog.Logger) *Sensor {
+	if l == nil {
+		l = slog.Default()
+	}
+
 	randSrc := rand.NewSource(time.Now().UnixNano() + int64(id)) // Add the id to ensure sensors created at the exact same nanosecond have different random sequences.
 	return &Sensor{
 		ID:       id,
@@ -36,6 +41,7 @@ func NewSensor(id int, dataCh chan<- model.SensorData, interval time.Duration, m
 		rand:     rand.New(randSrc),
 		idStr:    strconv.Itoa(id), // Convert ID to string once.
 		metrics:  m,
+		logger:   l.With("component", "sensor", "sensor_id", id),
 	}
 }
 
@@ -46,7 +52,7 @@ func (s *Sensor) Run(ctx context.Context) {
 	ticker := time.NewTicker(s.Interval)
 	defer ticker.Stop()
 
-	log.Printf("Sensor %d starting\n", s.ID)
+	s.logger.Info("Sensor starting", "sensor_id", s.ID)
 
 	if s.metrics != nil {
 		s.metrics.ActiveSensors.Inc()
@@ -56,7 +62,7 @@ func (s *Sensor) Run(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
-			log.Printf("Sensor %d stopping\n", s.ID)
+			s.logger.Info("Sensor stopping", "sensor_id", s.ID)
 			return
 		case <-ticker.C:
 			// Use a mutex to make random number generation safe for concurrent access
@@ -82,11 +88,12 @@ func (s *Sensor) Run(ctx context.Context) {
 
 // Start launches a simulated sensor (identified by ID) as a goroutine with panic recovery.
 // The goroutine runs the Sensor's Run method.
-func Start(ctx context.Context, id int, dataCh chan<- model.SensorData, interval time.Duration, m *metrics.Metrics) {
+func Start(ctx context.Context, id int, dataCh chan<- model.SensorData, interval time.Duration, m *metrics.Metrics, l *slog.Logger) {
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
-				log.Printf("Sensor %d panicked: %v - restarting\n", id, r)
+				panicLogger := l.With("component", "sensor", "sensor_id", id)
+				panicLogger.Error("Sensor panicked - restarting", "sensor_id", id, "panic", r)
 
 				// Restart the sensor only if the context is not done.
 				// This prevents a panic-restart loop if the context is cancelled.
@@ -96,12 +103,12 @@ func Start(ctx context.Context, id int, dataCh chan<- model.SensorData, interval
 						m.SensorRestarts.WithLabelValues(strconv.Itoa(id)).Inc()
 					}
 
-					Start(ctx, id, dataCh, interval, m)
+					Start(ctx, id, dataCh, interval, m, l)
 				}
 			}
 		}()
 
-		s := NewSensor(id, dataCh, interval, m)
+		s := NewSensor(id, dataCh, interval, m, l)
 		s.Run(ctx)
 	}()
 }
