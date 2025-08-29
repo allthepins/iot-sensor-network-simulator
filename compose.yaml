@@ -13,6 +13,11 @@ services:
     # `ctrl+c` (SIGINT) to be passed through.
     tty: true  # Attach a pseudo-TTY to the container.
     stdin_open: true  # Allow sending input to the container through standard input.
+    # Enable log collection via Promtail
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
 
   prometheus:
     image: prom/prometheus:v3.5.0
@@ -43,3 +48,19 @@ services:
     depends_on:
       # Ensure Prometheus is started before Grafana
       - prometheus
+
+  loki:
+    image: grafana/loki
+    container_name: loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki-data:/loki
+
+  promtail:
+    image: grafana/promtail
+    container_name: promtail
+    volumes:
+      - ./promtail/config.yaml:/etc/promtail/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers
