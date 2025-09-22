@@ -88,6 +88,13 @@ The stack includes a Grafana instance with a pre-built dashboard which provides 
 1. Access the Grafana UI at http://localhost:3000
 2. Login using the credentials `admin`/`admin`.
 3. Navigate to "Dashboards" to find the "IoT Simulator Dashboard".
+4. You can also view Prometheus metrics and service logs in Grafana.
+
+![Simulator overview](docs/images/overview_grafana.png)
+
+![Prometheus metrics](docs/images/prometheus_grafana.png)
+
+![Service logs](docs/images/logs_grafana.png)
 
 The dashboard in addition to providing real-time insights also fires an alert if any sensor restarts within a 5-minute window.
 
