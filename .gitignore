@@ -1,2 +1,5 @@
+# MacOS thingy
+.DS_Store
+
 # Loki data directory
 loki-data
