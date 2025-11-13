@@ -3,6 +3,7 @@ package nats
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -139,4 +140,46 @@ func (c *Client) configureStream(cfg Config) error {
 	}
 
 	return nil
+}
+
+// Publish publishes a message to the specified subject.
+func (c *Client) Publish(ctx context.Context, subject string, data []byte) error {
+	_, err := c.js.Publish(ctx, subject, data)
+	return err
+}
+
+// PublishJson publishes a JSON-encoded message to the specified subject.
+func (c *Client) PublishJson(ctx context.Context, subject string, v any) error {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return fmt.Errorf("failed to marshal JSON: %w", err)
+	}
+	return c.Publish(ctx, subject, data)
+}
+
+// Close gracefully closes the NATS connection.
+func (c *Client) Close() error {
+	if c.conn != nil {
+		c.logger.Info("Closing NATS connection")
+		c.conn.Close()
+	}
+	return nil
+}
+
+// IsConnected return true if the NATS connection is established.
+func (c *Client) IsConnected() bool {
+	return c.conn != nil && c.conn.IsConnected()
+}
+
+// Stats returns current connection statistics.
+func (c *Client) Stats() natsio.Statistics {
+	if c.conn == nil {
+		return natsio.Statistics{}
+	}
+	return c.conn.Stats()
+}
+
+// JetStream returns the underlying JetStream context for advanced operations.
+func (c *Client) JetStream() jetstream.JetStream {
+	return c.js
 }
