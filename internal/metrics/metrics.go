@@ -9,11 +9,15 @@ const namespace = "iot_simulator"
 
 // Metrics holds all Prometheus collectors for the application.
 type Metrics struct {
-	ActiveSensors    prometheus.Gauge
-	MessagesSent     *prometheus.CounterVec
-	GeneratedValues  *prometheus.HistogramVec
-	SensorRestarts   *prometheus.CounterVec
-	MessagesReceived prometheus.Counter
+	ActiveSensors        prometheus.Gauge
+	MessagesSent         *prometheus.CounterVec
+	GeneratedValues      *prometheus.HistogramVec
+	SensorRestarts       *prometheus.CounterVec
+	MessagesReceived     prometheus.Counter
+	NATSPublishSuccess   *prometheus.CounterVec
+	NATSPublishFailures  *prometheus.CounterVec
+	NATSPublishLatency   *prometheus.HistogramVec
+	NATSConnectionStatus prometheus.Gauge
 }
 
 func NewMetrics(reg prometheus.Registerer) *Metrics {
@@ -48,6 +52,31 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 			Name:      "messages_received_total",
 			Help:      "Total number of messages received by the aggregator.",
 		}),
+		NATSPublishSuccess: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "nats",
+			Name:      "public_success_total",
+			Help:      "Total number of successfully published messages to NATS.",
+		}, []string{"sensor_id", "error_type"}),
+		NATSPublishFailures: prometheus.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "nats",
+			Name:      "publish_failures_total",
+			Help:      "Total number of failed message publishes to NATS.",
+		}, []string{"sensor_id", "error_type"}),
+		NATSPublishLatency: prometheus.NewHistogramVec(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "nats",
+			Name:      "publish_latency_seconds",
+			Help:      "Latency of publishing messages to NATS in seconds.",
+			Buckets:   prometheus.ExponentialBuckets(0.001, 2, 10), // 1ms to ~1s
+		}, []string{"sensor_id"}),
+		NATSConnectionStatus: prometheus.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "nats",
+			Name:      "connection_status",
+			Help:      "Nats connection status (1 = connected, 0 = disconnected).",
+		}),
 	}
 
 	// Register all collectors with the provided registerer.
@@ -58,6 +87,10 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		m.GeneratedValues,
 		m.SensorRestarts,
 		m.MessagesReceived,
+		m.NATSPublishSuccess,
+		m.NATSPublishFailures,
+		m.NATSPublishLatency,
+		m.NATSConnectionStatus,
 
 		// Go runtime and process metrics
 		collectors.NewGoCollector(),
