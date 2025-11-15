@@ -55,9 +55,9 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 		NATSPublishSuccess: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "nats",
-			Name:      "public_success_total",
+			Name:      "publish_success_total",
 			Help:      "Total number of successfully published messages to NATS.",
-		}, []string{"sensor_id", "error_type"}),
+		}, []string{"sensor_id"}),
 		NATSPublishFailures: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "nats",
