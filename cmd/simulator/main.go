@@ -1,6 +1,6 @@
 // Package main starts the IoT Sensor Network Simulator.
 // It configures the sensor network, runs the aggregator,
-// and ensures graceful shutdown of all components.
+// and ensures the graceful shutdown of all components.
 package main
 
 import (
@@ -17,6 +17,8 @@ import (
 	"github.com/allthepins/iot-sensor-network-simulator/internal/logging"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/metrics"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/model"
+	"github.com/allthepins/iot-sensor-network-simulator/internal/nats"
+	"github.com/allthepins/iot-sensor-network-simulator/internal/publisher"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/sensor"
 	"github.com/allthepins/iot-sensor-network-simulator/internal/server"
 	"github.com/prometheus/client_golang/prometheus"
@@ -31,6 +33,7 @@ func main() {
 		sensorInterval     = 100 * time.Millisecond
 		metricsAddr        = ":2112"
 		pprofAddr          = ":6060"
+		enableNATS         = true // Feature flag for NATS integration. TODO Set via env var
 	)
 
 	// logging setup
@@ -51,6 +54,37 @@ func main() {
 	// Start the pprof server in a separate goroutine.
 	// This allows us to use go pprof tool profiling.
 	go server.StartPprofServer(mainCtx, pprofAddr)
+
+	// NATS setup (`enableNATS` feature flag controlled)
+	var natsClient *nats.Client
+	var publisherWg sync.WaitGroup
+
+	if enableNATS {
+		natsURL := os.Getenv("NATS_URL")
+		if natsURL == "" {
+			natsURL = "nats://localhost:4222"
+		}
+
+		natsCfg := nats.DefaultConfig()
+		natsCfg.URL = natsURL
+
+		var err error
+		natsClient, err = nats.NewClient(natsCfg, logger)
+		if err != nil {
+			logger.Error("Failed to connect to NATS, continuiong without NATS", "error", err)
+			appMetrics.NATSConnectionStatus.Set(0)
+			enableNATS = false
+		} else {
+			logger.Info("NATS client initialized", "url", natsURL)
+			appMetrics.NATSConnectionStatus.Set(1)
+
+			defer func() {
+				if err := natsClient.Close(); err != nil {
+					logger.Error("Error closing NATS client", "error", err)
+				}
+			}()
+		}
+	}
 
 	// Channel to listen for interrupt signals.
 	sigCh := make(chan os.Signal, 1)
@@ -89,6 +123,36 @@ func main() {
 		aggregator.New(dataCh, appMetrics, logger).Run(ctx)
 	}()
 
+	// Start the NATS publisher.
+	if enableNATS && natsClient != nil {
+		publisherWg.Add(1)
+		go func() {
+			defer publisherWg.Done()
+
+			pub := publisher.New(dataCh, natsClient, nats.DefaultSubjectPrefix, appMetrics, logger)
+			pub.Run(ctx)
+		}()
+
+		// Periodically check and update NATS connection status
+		go func() {
+			ticker := time.NewTicker(5 * time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if natsClient.IsConnected() {
+						appMetrics.NATSConnectionStatus.Set(1)
+					} else {
+						appMetrics.NATSConnectionStatus.Set(0)
+					}
+				}
+			}
+		}()
+	}
+
 	// Start sensors.
 	for i := 1; i <= sensorCount; i++ {
 		sensorsWg.Add(1)
@@ -106,7 +170,11 @@ func main() {
 		}(i, sensorInterval)
 	}
 
-	logger.Info("Simulation starting", "sensor_count", sensorCount, "simulation_duration", simulationDuration)
+	logger.Info("Simulation starting",
+		"sensor_count", sensorCount,
+		"simulation_duration", simulationDuration,
+		"nats_enabled", enableNATS,
+	)
 
 	// Launch a dedicated goroutine to orchestrate the shutdown of sensors.
 	go func() {
@@ -121,6 +189,12 @@ func main() {
 
 	// Wait for the aggregator.
 	aggregatorWg.Wait()
+
+	// Wait for the NATS publisher.
+	if enableNATS {
+		publisherWg.Wait()
+		logger.Info("NATS publisher shutdown complete.")
+	}
 
 	logger.Info("Simulation ended gracefully.")
 }
