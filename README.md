@@ -2,7 +2,7 @@
 
 Simulate a network of IoT sensors (built in Go).
 
-It concurrently runs thousands of virtual sensors that send data to a central aggregator.
+It concurrently runs thousands of virtual sensors that send data to a central aggregator and a publisher (that publishes to a NATS service).
 
 ## Features
 
@@ -18,6 +18,8 @@ It concurrently runs thousands of virtual sensors that send data to a central ag
 
 - **Built-in profiling:** Uses Go's built-in `pprof` tools to inspect performance in real time.
 
+- **NATS integration:** Distributed messaging with 24-hour message retention.
+
 ## Directory Structure
 ```
 ├── cmd/simulator/main.go   # Main application entry point.
@@ -25,6 +27,8 @@ It concurrently runs thousands of virtual sensors that send data to a central ag
 │   ├── aggregator/         # Consumes and processes sensor data.
 │   ├── metrics/            # Prometheus metric definitions.
 │   ├── model/              # Shared data structures (e.g. SensorData).
+│   ├── nats/               # NATS client and connection management.
+│   ├── publisher/          # Publishes sensor data to NATS.
 │   ├── sensor/             # Simulates a single IoT sensor.
 │   └── server/             # HTTP server for the metrics and pprof endpoints.
 ├── grafana/                # Grafana configuration.
@@ -65,6 +69,12 @@ docker compose up --build
 
 #### Running natively (local development):
 This requires Go 1.18 or later.
+
+First, ensure NATS is running (or set `enableNATS = false` in main.go):
+```shell
+# Run NATS with JetStream
+docker run -p 4222:4222 -p 8222:8222 nats:2.10-alpine -js
+```
 
 The application can be run direcly using the `go run` command. It runs for the configured duration or until you stop it manually with `ctrl+c`.
 ```shell
@@ -176,7 +186,7 @@ Inspect in interactive mode:
 
 ### **Publish/Subscribe**
 
-- [ ] NATS publisher integration
+- [x] NATS publisher integration
 - [ ] Basic aggregator subscriber
 
 ### **Nice to haves**

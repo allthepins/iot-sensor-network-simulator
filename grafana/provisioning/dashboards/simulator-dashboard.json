@@ -5,13 +5,23 @@
   "panels": [
     {
       "id": 1,
-      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 0 },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
       "type": "row",
       "title": "High-Level Overview"
     },
     {
       "id": 2,
-      "gridPos": { "h": 8, "w": 6, "x": 0, "y": 2 },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 2
+      },
       "type": "stat",
       "title": "Active Sensors",
       "targets": [
@@ -22,11 +32,19 @@
           "legendFormat": ""
         }
       ],
-      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
     },
     {
       "id": 3,
-      "gridPos": { "h": 8, "w": 6, "x": 6, "y": 2 },
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 2
+      },
       "type": "stat",
       "title": "Message Ingestion Rate",
       "targets": [
@@ -37,13 +55,23 @@
         }
       ],
       "fieldConfig": {
-        "defaults": { "unit": "Mps" }
+        "defaults": {
+          "unit": "Mps"
+        }
       },
-      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
     },
     {
       "id": 4,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 2 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 2
+      },
       "type": "timeseries",
       "title": "Message Rates (Sent vs. Received)",
       "targets": [
@@ -58,18 +86,222 @@
           "legendFormat": "Received Rate"
         }
       ],
-      "fieldConfig": { "defaults": { "unit": "Mps" } },
-      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mps"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
+    },
+    {
+      "id": 11,
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 10
+      },
+      "type": "row",
+      "title": "NATS Publisher Metrics"
+    },
+    {
+      "id": 12,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 0,
+        "y": 12
+      },
+      "type": "stat",
+      "title": "NATS Connection Status",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "iot_simulator_nats_connection_status",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {
+              "options": {
+                "0": {
+                  "text": "Disconnected",
+                  "color": "red"
+                }
+              },
+              "type": "value"
+            },
+            {
+              "options": {
+                "1": {
+                  "text": "Connected",
+                  "color": "green"
+                }
+              },
+              "type": "value"
+            }
+          ]
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
+    },
+    {
+      "id": 13,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 6,
+        "y": 12
+      },
+      "type": "stat",
+      "title": "NATS Publish Rate",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(iot_simulator_nats_publish_success_total[1m]))",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mps"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
+    },
+    {
+      "id": 14,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 12,
+        "y": 12
+      },
+      "type": "stat",
+      "title": "NATS Publish Failures",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(iot_simulator_nats_publish_failures_total[1m]))",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Fps",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "value": 0,
+                "color": "green"
+              },
+              {
+                "value": 0.1,
+                "color": "red"
+              }
+            ]
+          }
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
+    },
+    {
+      "id": 15,
+      "gridPos": {
+        "h": 8,
+        "w": 6,
+        "x": 18,
+        "y": 12
+      },
+      "type": "gauge",
+      "title": "NATS Publish Latency (p95)",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum(rate(iot_simulator_nats_publish_latency_seconds_bucket[1m])) by (le))",
+          "instant": true
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "max": 0.1
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
+    },
+    {
+      "id": 16,
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 20
+      },
+      "type": "timeseries",
+      "title": "NATS Publish Success vs Failures Over Time",
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(iot_simulator_nats_publish_success_total[1m]))",
+          "legendFormat": "Success Rate"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(iot_simulator_nats_publish_failures_total[1m]))",
+          "legendFormat": "Failure Rate"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Mps"
+        }
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
     },
     {
       "id": 5,
-      "gridPos": { "h": 2, "w": 24, "x": 0, "y": 10 },
+      "gridPos": {
+        "h": 2,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
       "type": "row",
       "title": "Sensor Health & Performance"
     },
     {
       "id": 6,
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 30
+      },
       "type": "timeseries",
       "title": "Sensor Restarts Over Time",
       "alerting": {
@@ -82,9 +314,22 @@
             "conditions": [
               {
                 "type": "query",
-                "query": { "params": ["A", "5m", "now"] },
-                "reducer": { "type": "last" },
-                "evaluator": { "type": "gt", "params": [0] }
+                "query": {
+                  "params": [
+                    "A",
+                    "5m",
+                    "now"
+                  ]
+                },
+                "reducer": {
+                  "type": "last"
+                },
+                "evaluator": {
+                  "type": "gt",
+                  "params": [
+                    0
+                  ]
+                }
               }
             ],
             "title": "High Sensor Restart Rate"
@@ -98,11 +343,19 @@
           "legendFormat": "Restarts"
         }
       ],
-      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
     },
     {
       "id": 7,
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 30
+      },
       "type": "table",
       "title": "Sensors with Most Restarts",
       "targets": [
@@ -112,11 +365,19 @@
           "instant": true
         }
       ],
-      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
     },
     {
       "id": 8,
-      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "gridPos": {
+        "h": 10,
+        "w": 24,
+        "x": 0,
+        "y": 38
+      },
       "type": "heatmap",
       "title": "Sensor Value Distribution",
       "targets": [
@@ -125,7 +386,10 @@
           "expr": "sum(rate(iot_simulator_sensor_generated_values_bucket[5m])) by (le)"
         }
       ],
-      "datasource": { "type": "prometheus", "uid": "Prometheus" }
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      }
     }
   ],
   "refresh": "10s",
@@ -143,5 +407,5 @@
   "timezone": "browser",
   "title": "IoT Simulator Dashboard",
   "uid": "iot-simulator",
-  "version": 1
+  "version": 2
 }
